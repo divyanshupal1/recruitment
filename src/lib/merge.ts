@@ -1,48 +1,9 @@
 import type { DriveData } from '../types/drive.js';
 
-/**
- * Deep merges two DriveData objects. Values from `source` override `target`
- * only when the source value is non-null and non-undefined.
- * Arrays are replaced (not concatenated) when source has a value.
- */
-export function mergeDriveData(
-  target: Partial<DriveData>,
-  source: Partial<DriveData>
-): Partial<DriveData> {
-  const result = { ...target };
-
-  for (const key of Object.keys(source) as Array<keyof DriveData>) {
-    const sourceVal = source[key];
-    const targetVal = result[key];
-
-    if (sourceVal === null || sourceVal === undefined) {
-      continue;
-    }
-
-    if (
-      typeof sourceVal === 'object' &&
-      !Array.isArray(sourceVal) &&
-      typeof targetVal === 'object' &&
-      targetVal !== null &&
-      !Array.isArray(targetVal)
-    ) {
-      // Deep merge nested objects (setupDetails, positionDetails, etc.)
-      (result as Record<string, unknown>)[key] = mergeObjects(
-        targetVal as Record<string, unknown>,
-        sourceVal as Record<string, unknown>
-      );
-    } else {
-      (result as Record<string, unknown>)[key] = sourceVal;
-    }
-  }
-
-  return result;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * Generic deep merge for plain objects. Source values override target values
- * when non-null/undefined.
- */
 function mergeObjects(
   target: Record<string, unknown>,
   source: Record<string, unknown>
@@ -57,23 +18,29 @@ function mergeObjects(
       continue;
     }
 
-    if (
-      typeof sourceVal === 'object' &&
-      !Array.isArray(sourceVal) &&
-      typeof targetVal === 'object' &&
-      targetVal !== null &&
-      !Array.isArray(targetVal)
-    ) {
-      result[key] = mergeObjects(
-        targetVal as Record<string, unknown>,
-        sourceVal as Record<string, unknown>
-      );
+    if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
+      result[key] = mergeObjects(targetVal, sourceVal);
     } else {
       result[key] = sourceVal;
     }
   }
 
   return result;
+}
+
+/**
+ * Deep merges two DriveData objects. Values from `source` override `target`
+ * only when the source value is non-null and non-undefined.
+ * Arrays are replaced (not concatenated) when source has a value.
+ */
+export function mergeDriveData(
+  target: Partial<DriveData>,
+  source: Partial<DriveData>
+): Partial<DriveData> {
+  return mergeObjects(
+    target as Record<string, unknown>,
+    source as Record<string, unknown>
+  ) as Partial<DriveData>;
 }
 
 /**

@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, SchemaType, type Part, type Schema } from '@google/generative-ai';
+import type { Part, Schema } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import type { DriveData } from '../types/drive.js';
 import type { Question } from '../types/question.js';
 import {
@@ -7,23 +8,14 @@ import {
   DRIVE_FINALIZATION_PROMPT,
 } from '../lib/prompts.js';
 
-// ==========================================
-// Initialize Gemini
-// ==========================================
-
 const apiKey = process.env.GOOGLE_API_KEY;
 if (!apiKey) {
   throw new Error('GOOGLE_API_KEY environment variable is required');
 }
 
 const genAI = new GoogleGenerativeAI(apiKey);
-
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-
-// ==========================================
-// Gemini Response Schemas (OpenAPI 3.0 style)
-// ==========================================
 
 const DRIVE_DATA_RESPONSE_SCHEMA = {
   type: SchemaType.OBJECT,
@@ -139,59 +131,39 @@ const QUESTIONS_RESPONSE_SCHEMA = {
   required: ['questions', 'summary'],
 };
 
-// ==========================================
-// Core AI Functions
-// ==========================================
+async function generateStructuredJson<T>(parts: Part[], schema: Schema): Promise<T> {
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    },
+  });
 
-/**
- * Parse a JD file using Gemini inline data (base64) to extract structured drive data.
- * Uses inline data instead of File API for serverless compatibility (Vercel, etc.).
- */
+  return JSON.parse(result.response.text()) as T;
+}
+
 export async function parseJDFromFile(
   fileBuffer: Buffer,
   mimeType: string,
   fileName: string
-): Promise<{ parsedData: Partial<DriveData>; geminiFileUri?: string }> {
-  // Convert buffer to base64 for inline data
+): Promise<{ parsedData: Partial<DriveData> }> {
   const base64Data = fileBuffer.toString('base64');
 
   console.log(`[Gemini] Parsing JD via inline data: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
 
-  // Generate structured data from the file using inline base64
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data,
-            },
-          } as Part,
-          { text: JD_PARSING_PROMPT },
-        ],
-      },
+  const parsedData = await generateStructuredJson<Partial<DriveData>>(
+    [
+      { inlineData: { mimeType, data: base64Data } } as Part,
+      { text: JD_PARSING_PROMPT },
     ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: DRIVE_DATA_RESPONSE_SCHEMA as Schema,
-    },
-  });
-
-  const responseText = result.response.text();
-  const parsedData = JSON.parse(responseText) as Partial<DriveData>;
+    DRIVE_DATA_RESPONSE_SCHEMA as Schema
+  );
 
   console.log('[Gemini] JD parsed successfully');
-
-  return {
-    parsedData,
-  };
+  return { parsedData };
 }
 
-/**
- * Analyze current drive data and generate clarification questions for missing fields.
- */
 export async function generateClarificationQuestions(
   driveData: Partial<DriveData>,
   previousAnswers?: Record<string, unknown>
@@ -209,73 +181,31 @@ export async function generateClarificationQuestions(
     );
   }
 
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: contextParts.join('') }],
-      },
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: QUESTIONS_RESPONSE_SCHEMA as Schema,
-    },
-  });
-
-  const responseText = result.response.text();
-  const parsed = JSON.parse(responseText) as { questions: Question[]; summary: string };
+  const parsed = await generateStructuredJson<{ questions: Question[]; summary: string }>(
+    [{ text: contextParts.join('') }],
+    QUESTIONS_RESPONSE_SCHEMA as Schema
+  );
 
   console.log(`[Gemini] Generated ${parsed.questions.length} clarification questions`);
-
   return parsed;
 }
 
-/**
- * Generate the final complete drive data by merging all sources.
- */
 export async function generateFinalDriveData(
-  driveData: Partial<DriveData>,
-  fileUris?: string[]
+  driveData: Partial<DriveData>
 ): Promise<Partial<DriveData>> {
-  const parts: Part[] = [];
-
-  // Attach any file references for additional context
-  if (fileUris && fileUris.length > 0) {
-    for (const uri of fileUris) {
-      parts.push({
-        fileData: {
-          mimeType: 'application/pdf',
-          fileUri: uri,
-        },
-      } as Part);
-    }
-  }
-
-  parts.push({
-    text:
-      DRIVE_FINALIZATION_PROMPT +
-      '\n\n## Current Drive Data (merge of JD parsing + user answers)\n```json\n' +
-      JSON.stringify(driveData, null, 2) +
-      '\n```\n\nProduce the final, complete, and clean DriveData object.',
-  });
-
-  const result = await model.generateContent({
-    contents: [
+  const finalData = await generateStructuredJson<Partial<DriveData>>(
+    [
       {
-        role: 'user',
-        parts,
+        text:
+          DRIVE_FINALIZATION_PROMPT +
+          '\n\n## Current Drive Data (merge of JD parsing + user answers)\n```json\n' +
+          JSON.stringify(driveData, null, 2) +
+          '\n```\n\nProduce the final, complete, and clean DriveData object.',
       },
     ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: DRIVE_DATA_RESPONSE_SCHEMA as Schema,
-    },
-  });
-
-  const responseText = result.response.text();
-  const finalData = JSON.parse(responseText) as Partial<DriveData>;
+    DRIVE_DATA_RESPONSE_SCHEMA as Schema
+  );
 
   console.log('[Gemini] Final drive data generated');
-
   return finalData;
 }

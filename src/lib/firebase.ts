@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import admin from 'firebase-admin';
 
 const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
@@ -24,7 +25,6 @@ function loadServiceAccount(): admin.ServiceAccount {
   // Option 2: File path (local development)
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './serviceAccountKey.json';
   try {
-    const { readFileSync } = require('fs') as typeof import('fs');
     return JSON.parse(readFileSync(serviceAccountPath, 'utf-8')) as admin.ServiceAccount;
   } catch {
     throw new Error(

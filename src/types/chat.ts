@@ -66,7 +66,6 @@ export const UploadedFileSchema = z.object({
   mimeType: z.string(),
   fileSize: z.number(),
   storageUrl: z.string(),
-  geminiFileUri: z.string().optional(),
   parsedData: DriveDataSchema.optional(),
   uploadedAt: z.string(),
 });

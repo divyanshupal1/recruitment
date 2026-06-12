@@ -452,7 +452,6 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
           mimeType: { type: 'string' },
           fileSize: { type: 'number' },
           storageUrl: { type: 'string', format: 'uri' },
-          geminiFileUri: { type: 'string' },
           parsedData: { $ref: '#/components/schemas/DriveData' },
           uploadedAt: { type: 'string', format: 'date-time' },
         },

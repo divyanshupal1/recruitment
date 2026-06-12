@@ -8,6 +8,8 @@ import chats from './routes/chats.js';
 import files from './routes/files.js';
 import generate from './routes/generate.js';
 import { openApiSpec } from './lib/openapi-spec.js';
+import { nowISO } from './lib/time.js';
+import { AppError } from './lib/errors.js';
 
 // ==========================================
 // App Setup
@@ -35,7 +37,7 @@ app.get('/', (c) => {
     service: 'recruitment-agent',
     version: '1.0.0',
     status: 'healthy',
-    timestamp: new Date().toISOString(),
+    timestamp: nowISO(),
   });
 });
 
@@ -84,6 +86,12 @@ app.route('/api/chats', generate);
 // ==========================================
 
 app.onError((err, c) => {
+  if (err instanceof AppError) {
+    const body: Record<string, string> = { error: err.message };
+    if (err.details) body.details = err.details;
+    return c.json(body, err.statusCode as 400 | 404 | 500);
+  }
+
   console.error('[Server] Unhandled error:', err);
   return c.json(
     {
