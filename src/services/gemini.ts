@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI, SchemaType, type Part, type Schema } from '@google/generative-ai';
-import { GoogleAIFileManager } from '@google/generative-ai/server';
 import type { DriveData } from '../types/drive.js';
 import type { Question } from '../types/question.js';
 import {
@@ -18,7 +17,6 @@ if (!apiKey) {
 }
 
 const genAI = new GoogleGenerativeAI(apiKey);
-const fileManager = new GoogleAIFileManager(apiKey);
 
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
@@ -145,83 +143,49 @@ const QUESTIONS_RESPONSE_SCHEMA = {
 // ==========================================
 
 /**
- * Upload a file to Gemini File API and parse the JD to extract structured drive data.
+ * Parse a JD file using Gemini inline data (base64) to extract structured drive data.
+ * Uses inline data instead of File API for serverless compatibility (Vercel, etc.).
  */
 export async function parseJDFromFile(
   fileBuffer: Buffer,
   mimeType: string,
   fileName: string
-): Promise<{ parsedData: Partial<DriveData>; geminiFileUri: string }> {
-  // Upload to Gemini File API via inline data (buffer)
-  // Write buffer to a temp file for the file manager
-  const { writeFileSync, unlinkSync, mkdtempSync } = await import('fs');
-  const { join } = await import('path');
-  const { tmpdir } = await import('os');
+): Promise<{ parsedData: Partial<DriveData>; geminiFileUri?: string }> {
+  // Convert buffer to base64 for inline data
+  const base64Data = fileBuffer.toString('base64');
 
-  const tempDir = mkdtempSync(join(tmpdir(), 'recruitment-'));
-  const tempPath = join(tempDir, fileName);
-  writeFileSync(tempPath, fileBuffer);
+  console.log(`[Gemini] Parsing JD via inline data: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
 
-  try {
-    const uploadResult = await fileManager.uploadFile(tempPath, {
-      mimeType,
-      displayName: fileName,
-    });
-
-    console.log(`[Gemini] File uploaded: ${uploadResult.file.uri}`);
-
-    // Wait for file to be processed
-    let file = uploadResult.file;
-    while (file.state === 'PROCESSING') {
-      console.log('[Gemini] Waiting for file processing...');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const getResult = await fileManager.getFile(file.name);
-      file = getResult;
-    }
-
-    if (file.state === 'FAILED') {
-      throw new Error('Gemini file processing failed');
-    }
-
-    // Generate structured data from the file
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              fileData: {
-                mimeType: file.mimeType,
-                fileUri: file.uri,
-              },
-            } as Part,
-            { text: JD_PARSING_PROMPT },
-          ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: DRIVE_DATA_RESPONSE_SCHEMA as Schema,
+  // Generate structured data from the file using inline base64
+  const result = await model.generateContent({
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data,
+            },
+          } as Part,
+          { text: JD_PARSING_PROMPT },
+        ],
       },
-    });
+    ],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: DRIVE_DATA_RESPONSE_SCHEMA as Schema,
+    },
+  });
 
-    const responseText = result.response.text();
-    const parsedData = JSON.parse(responseText) as Partial<DriveData>;
+  const responseText = result.response.text();
+  const parsedData = JSON.parse(responseText) as Partial<DriveData>;
 
-    console.log('[Gemini] JD parsed successfully');
+  console.log('[Gemini] JD parsed successfully');
 
-    return {
-      parsedData,
-      geminiFileUri: file.uri,
-    };
-  } finally {
-    // Cleanup temp file
-    try {
-      unlinkSync(tempPath);
-    } catch {
-      // ignore cleanup errors
-    }
-  }
+  return {
+    parsedData,
+  };
 }
 
 /**

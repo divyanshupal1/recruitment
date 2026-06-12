@@ -73,6 +73,7 @@ files.post('/:chatId/files', async (c) => {
     // 2. Parse the JD using Gemini
     let parsedData: Partial<DriveData> = {};
     let geminiFileUri: string | undefined;
+    let parseWarning: string | undefined;
 
     try {
       const parseResult = await parseJDFromFile(fileBuffer, file.type, file.name);
@@ -80,7 +81,9 @@ files.post('/:chatId/files', async (c) => {
       geminiFileUri = parseResult.geminiFileUri;
       console.log('[Files] JD parsed successfully via Gemini');
     } catch (parseError) {
-      console.error('[Files] JD parsing failed:', parseError);
+      const errorMsg = String(parseError);
+      console.error('[Files] JD parsing failed:', errorMsg);
+      parseWarning = errorMsg;
       // Continue even if parsing fails — file is still uploaded
     }
 
@@ -122,7 +125,7 @@ files.post('/:chatId/files', async (c) => {
     await chatMessagesCollection(chatId).doc(uploadMessage.id).set(uploadMessage);
 
     // Create an assistant message with parsing summary
-    const parsingSummary = buildParsingSummary(parsedData);
+    const parsingSummary = buildParsingSummary(parsedData, parseWarning);
     const assistantMessage: ChatMessage = {
       id: uuidv4(),
       chatId,
@@ -138,6 +141,7 @@ files.post('/:chatId/files', async (c) => {
     return c.json({
       file: uploadedFile,
       parsedData,
+      parseWarning,
       message: parsingSummary,
     }, 201);
   } catch (error) {
@@ -182,7 +186,7 @@ files.get('/:chatId/files', async (c) => {
 // Helpers
 // ==========================================
 
-function buildParsingSummary(data: Partial<DriveData>): string {
+function buildParsingSummary(data: Partial<DriveData>, parseWarning?: string): string {
   const parts: string[] = ['📄 Job Description parsed successfully. Here\'s what I found:\n'];
 
   const setup = data.setupDetails;
@@ -208,7 +212,11 @@ function buildParsingSummary(data: Partial<DriveData>): string {
   }
 
   if (parts.length === 1) {
-    parts.push('⚠️ Could not extract structured data from this file. You can proceed with manual input.');
+    if (parseWarning) {
+      parts.push(`⚠️ AI parsing failed: ${parseWarning}\n\nThe file was uploaded successfully. You can proceed with manual input.`);
+    } else {
+      parts.push('⚠️ Could not extract structured data from this file. You can proceed with manual input.');
+    }
   }
 
   return parts.join('\n');
