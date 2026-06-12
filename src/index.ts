@@ -47,9 +47,20 @@ app.get('/health', (c) => {
 // Swagger / OpenAPI Documentation
 // ==========================================
 
-// Serve OpenAPI JSON spec
+// Serve OpenAPI JSON spec (dynamically sets server URL from request)
 app.get('/api/docs/openapi.json', (c) => {
-  return c.json(openApiSpec);
+  const url = new URL(c.req.url);
+  const currentOrigin = `${url.protocol}//${url.host}`;
+
+  const spec = {
+    ...openApiSpec,
+    servers: [
+      { url: currentOrigin, description: 'Current server' },
+      ...(openApiSpec.servers || []),
+    ],
+  };
+
+  return c.json(spec);
 });
 
 // Serve Swagger UI at /docs
