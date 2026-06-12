@@ -43,34 +43,6 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
 
-// Debug endpoint to verify Gemini API key (remove in production)
-app.get('/debug/gemini', async (c) => {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const keyInfo = apiKey
-    ? { set: true, prefix: apiKey.substring(0, 10) + '...', length: apiKey.length }
-    : { set: false };
-
-  let geminiTest: { success: boolean; error?: string; response?: string } = { success: false };
-
-  if (apiKey) {
-    try {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      const result = await model.generateContent('Say "hello" in one word.');
-      geminiTest = { success: true, response: result.response.text().substring(0, 100) };
-    } catch (err) {
-      geminiTest = { success: false, error: String(err).substring(0, 500) };
-    }
-  }
-
-  return c.json({
-    apiKey: keyInfo,
-    geminiTest,
-    env: process.env.NODE_ENV || 'not set',
-  });
-});
-
 // ==========================================
 // Swagger / OpenAPI Documentation
 // ==========================================
