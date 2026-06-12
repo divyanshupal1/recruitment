@@ -1,0 +1,562 @@
+import type { OpenAPIV3 } from './openapi-types.js';
+
+export const openApiSpec: OpenAPIV3 = {
+  openapi: '3.0.3',
+  info: {
+    title: 'Recruitment Agent API',
+    description: `AI-powered recruitment drive creation agent. Upload job description PDFs, extract structured data via Gemini AI, and generate complete recruitment drive configurations through a conversational Q&A flow.
+
+## Flow
+1. **Create a chat** → \`POST /api/chats\`
+2. **Upload JD PDF** → \`POST /api/chats/{chatId}/files\`
+3. **Generate drive data** → \`POST /api/chats/{chatId}/generate\` (returns questions if data is incomplete)
+4. **Submit answers** → \`POST /api/chats/{chatId}/generate\` with answers (repeat until complete)`,
+    version: '1.0.0',
+    contact: {
+      name: 'Recruitment Agent',
+    },
+  },
+  servers: [
+    {
+      url: 'http://localhost:3000',
+      description: 'Local development server',
+    },
+  ],
+  tags: [
+    { name: 'Health', description: 'Health check endpoints' },
+    { name: 'Chats', description: 'Chat management' },
+    { name: 'Files', description: 'File upload and listing' },
+    { name: 'Generate', description: 'Drive data generation' },
+  ],
+  paths: {
+    '/': {
+      get: {
+        tags: ['Health'],
+        summary: 'Health check',
+        operationId: 'healthCheck',
+        responses: {
+          '200': {
+            description: 'Service is healthy',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    service: { type: 'string', example: 'recruitment-agent' },
+                    version: { type: 'string', example: '1.0.0' },
+                    status: { type: 'string', example: 'healthy' },
+                    timestamp: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
+    '/api/chats': {
+      post: {
+        tags: ['Chats'],
+        summary: 'Create a new chat',
+        operationId: 'createChat',
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  title: {
+                    type: 'string',
+                    description: 'Chat title',
+                    example: 'Software Engineer Drive 2026',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Chat created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    chat: { $ref: '#/components/schemas/Chat' },
+                  },
+                },
+              },
+            },
+          },
+          '500': { $ref: '#/components/responses/InternalError' },
+        },
+      },
+      get: {
+        tags: ['Chats'],
+        summary: 'List all chats',
+        operationId: 'listChats',
+        responses: {
+          '200': {
+            description: 'List of chats',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    chats: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Chat' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
+    '/api/chats/{chatId}': {
+      get: {
+        tags: ['Chats'],
+        summary: 'Get chat details',
+        operationId: 'getChat',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        responses: {
+          '200': {
+            description: 'Chat details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    chat: { $ref: '#/components/schemas/Chat' },
+                  },
+                },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/chats/{chatId}/messages': {
+      get: {
+        tags: ['Chats'],
+        summary: 'List chat messages',
+        operationId: 'listMessages',
+        parameters: [
+          { $ref: '#/components/parameters/ChatId' },
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', default: 50 },
+            description: 'Max messages to return',
+          },
+          {
+            name: 'before',
+            in: 'query',
+            schema: { type: 'string' },
+            description: 'Cursor for pagination (createdAt timestamp)',
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'List of messages',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    messages: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/ChatMessage' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/chats/{chatId}/files': {
+      post: {
+        tags: ['Files'],
+        summary: 'Upload a JD file',
+        description: 'Upload a Job Description PDF/DOC file. The file is stored in Firebase Storage, parsed by Gemini AI to extract structured drive data, and the parsed data is merged into the chat\'s accumulated drive data.',
+        operationId: 'uploadFile',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'PDF, DOC, or DOCX file',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'File uploaded and parsed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    file: { $ref: '#/components/schemas/UploadedFile' },
+                    parsedData: { $ref: '#/components/schemas/DriveData' },
+                    message: { type: 'string', description: 'Summary of parsed data' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description: 'Invalid file or missing file',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '500': { $ref: '#/components/responses/InternalError' },
+        },
+      },
+      get: {
+        tags: ['Files'],
+        summary: 'List uploaded files',
+        operationId: 'listFiles',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        responses: {
+          '200': {
+            description: 'List of uploaded files',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    files: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/UploadedFile' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/chats/{chatId}/generate': {
+      post: {
+        tags: ['Generate'],
+        summary: 'Generate drive data or get clarification questions',
+        description: `Main generation endpoint. Analyzes current drive data state and either:
+- Returns **questions** if required fields are missing
+- Returns **final drive data** if all data is complete
+
+Submit answers to previously asked questions by passing them in the \`answers\` field. Answers are keyed by dot-path (e.g. \`setupDetails.candidateType\`).`,
+        operationId: 'generateDriveData',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  message: {
+                    type: 'string',
+                    description: 'Optional text message from user',
+                    example: 'Generate the recruitment drive from uploaded JD',
+                  },
+                  answers: {
+                    type: 'object',
+                    description: 'Answers to clarification questions, keyed by field dot-path',
+                    additionalProperties: {},
+                    example: {
+                      'setupDetails.candidateType': 'freshers',
+                      'setupDetails.numberOfVacancies': 10,
+                      'positionDetails.employmentType': 'full_time',
+                      'positionDetails.salaryPackage': '8-12 LPA',
+                    },
+                  },
+                  fileIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Additional file IDs to include in generation context',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Questions returned or drive data generated',
+            content: {
+              'application/json': {
+                schema: {
+                  oneOf: [
+                    {
+                      type: 'object',
+                      properties: {
+                        type: { type: 'string', enum: ['questions'] },
+                        summary: { type: 'string' },
+                        questions: {
+                          type: 'array',
+                          items: { $ref: '#/components/schemas/Question' },
+                        },
+                        currentDriveData: { $ref: '#/components/schemas/DriveData' },
+                      },
+                    },
+                    {
+                      type: 'object',
+                      properties: {
+                        type: { type: 'string', enum: ['drive_data'] },
+                        driveData: { $ref: '#/components/schemas/DriveData' },
+                        message: { type: 'string' },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '500': { $ref: '#/components/responses/InternalError' },
+        },
+      },
+    },
+
+    '/api/chats/{chatId}/drive-data': {
+      get: {
+        tags: ['Generate'],
+        summary: 'Get current drive data',
+        operationId: 'getDriveData',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        responses: {
+          '200': {
+            description: 'Current accumulated drive data',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    driveData: { $ref: '#/components/schemas/DriveData' },
+                    status: { type: 'string', enum: ['active', 'completed'] },
+                  },
+                },
+              },
+            },
+          },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+  },
+
+  components: {
+    parameters: {
+      ChatId: {
+        name: 'chatId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+        description: 'Chat ID',
+      },
+    },
+    responses: {
+      NotFound: {
+        description: 'Resource not found',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' },
+          },
+        },
+      },
+      InternalError: {
+        description: 'Internal server error',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' },
+          },
+        },
+      },
+    },
+    schemas: {
+      Error: {
+        type: 'object',
+        properties: {
+          error: { type: 'string' },
+          details: { type: 'string' },
+        },
+      },
+
+      Chat: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          title: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          status: { type: 'string', enum: ['active', 'completed'] },
+          driveData: { $ref: '#/components/schemas/DriveData' },
+        },
+      },
+
+      ChatMessage: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          chatId: { type: 'string', format: 'uuid' },
+          role: { type: 'string', enum: ['user', 'assistant', 'system'] },
+          type: { type: 'string', enum: ['text', 'file_upload', 'questions', 'drive_data', 'answers'] },
+          content: { type: 'string' },
+          questions: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Question' },
+          },
+          answers: { type: 'object', additionalProperties: {} },
+          fileIds: { type: 'array', items: { type: 'string' } },
+          driveData: { $ref: '#/components/schemas/DriveData' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      UploadedFile: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          chatId: { type: 'string', format: 'uuid' },
+          fileName: { type: 'string' },
+          mimeType: { type: 'string' },
+          fileSize: { type: 'number' },
+          storageUrl: { type: 'string', format: 'uri' },
+          geminiFileUri: { type: 'string' },
+          parsedData: { $ref: '#/components/schemas/DriveData' },
+          uploadedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      DriveData: {
+        type: 'object',
+        description: 'Recruitment drive configuration data',
+        properties: {
+          setupDetails: {
+            type: 'object',
+            properties: {
+              candidateType: { type: 'string', enum: ['freshers', 'experienced'] },
+              experience: { type: 'string', description: 'Required experience range', example: '2-5 years' },
+              positionTitles: { type: 'array', items: { type: 'string' } },
+              numberOfVacancies: { type: 'integer' },
+              jobTitle: { type: 'string' },
+              preferredYearOfGraduation: { type: 'integer' },
+              targetJoiningDate: { type: 'string', format: 'date' },
+            },
+          },
+          positionDetails: {
+            type: 'object',
+            properties: {
+              employmentType: { type: 'string', enum: ['full_time', 'internship_full_time', 'internship'] },
+              locationType: { type: 'string', enum: ['remote', 'onsite', 'hybrid'] },
+              locationDetails: { type: 'string' },
+              jobDescription: { type: 'string' },
+              requiredSkills: { type: 'array', items: { type: 'string' } },
+              goodToHaveSkills: { type: 'array', items: { type: 'string' } },
+              salaryPackage: { type: 'string' },
+              probationPeriod: { type: 'string' },
+              bondPeriod: { type: 'string' },
+              bondAmount: { type: 'string' },
+            },
+          },
+          eligibilityCriteria: {
+            type: 'object',
+            properties: {
+              eligibleCourses: { type: 'array', items: { type: 'string' } },
+              academicCriteria: {
+                type: 'object',
+                properties: {
+                  postGraduationMarks: { type: 'number' },
+                  graduationMarks: { type: 'number' },
+                  twelfthMarks: { type: 'number' },
+                  diplomaMarks: { type: 'number' },
+                  tenthMarks: { type: 'number' },
+                  backpaperAllowed: { type: 'boolean' },
+                  backpaperType: { type: 'string', enum: ['live', 'total'] },
+                  maxBackpapers: { type: 'integer' },
+                },
+              },
+              eligibilityDate: { type: 'string', format: 'date' },
+              maxAge: { type: 'integer' },
+            },
+          },
+          collegeSelection: {
+            type: 'object',
+            properties: {
+              locations: { type: 'array', items: { type: 'string' } },
+              universityTypes: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          schedulingDetails: { type: 'object', additionalProperties: {} },
+          customFields: { type: 'object', additionalProperties: {} },
+        },
+      },
+
+      Question: {
+        type: 'object',
+        description: 'Clarification question for missing drive data fields',
+        required: ['id', 'field', 'question', 'type', 'required'],
+        properties: {
+          id: { type: 'string', description: 'Unique question identifier' },
+          field: { type: 'string', description: 'Dot-path to DriveData field', example: 'setupDetails.candidateType' },
+          question: { type: 'string', description: 'Human-readable question text' },
+          type: { type: 'string', enum: ['single_select', 'multi_select', 'text', 'number', 'date'] },
+          options: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/QuestionOption' },
+          },
+          required: { type: 'boolean' },
+          defaultValue: {},
+          validation: {
+            type: 'object',
+            properties: {
+              min: { type: 'number' },
+              max: { type: 'number' },
+              pattern: { type: 'string' },
+            },
+          },
+        },
+      },
+
+      QuestionOption: {
+        type: 'object',
+        required: ['value', 'label'],
+        properties: {
+          value: { type: 'string' },
+          label: { type: 'string' },
+          description: { type: 'string' },
+        },
+      },
+    },
+  },
+};
