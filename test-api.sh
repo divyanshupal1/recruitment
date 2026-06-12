@@ -5,7 +5,7 @@
 # Usage: bash test-api.sh [sample.pdf]
 # If no PDF is provided, file upload test is skipped.
 
-BASE_URL="http://localhost:3000"
+BASE_URL="https://recruitment-nu-six.vercel.app"
 PDF_FILE="${1:-}"
 
 echo "============================================"
