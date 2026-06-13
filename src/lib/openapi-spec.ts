@@ -464,28 +464,49 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
           setupDetails: {
             type: 'object',
             properties: {
-              candidateType: { type: 'string', enum: ['freshers', 'experienced'] },
-              experience: { type: 'string', description: 'Required experience range', example: '2-5 years' },
-              positionTitles: { type: 'array', items: { type: 'string' } },
+              candidateType: { type: 'string', enum: ['fresh_graduates', 'experienced'] },
+              positionTitle: { type: 'string', example: 'Software Engineer' },
               numberOfVacancies: { type: 'integer' },
-              jobTitle: { type: 'string' },
-              preferredYearOfGraduation: { type: 'integer' },
-              targetJoiningDate: { type: 'string', format: 'date' },
+              driveTitle: { type: 'string', example: 'Alpha Tech Campus Drive 2026' },
+              preferredYearOfGraduation: { type: 'array', items: { type: 'integer' } },
+              targetJoiningTimeframe: {
+                type: 'object',
+                properties: {
+                  hasTarget: { type: 'boolean' },
+                  format: { type: 'string', enum: ['date', 'month_year', 'year'] },
+                  value: { type: 'string' },
+                },
+              },
             },
           },
           positionDetails: {
             type: 'object',
             properties: {
-              employmentType: { type: 'string', enum: ['full_time', 'internship_full_time', 'internship'] },
-              locationType: { type: 'string', enum: ['remote', 'onsite', 'hybrid'] },
-              locationDetails: { type: 'string' },
+              employmentType: { type: 'string', enum: ['full_time', 'internship', 'full_time_internship'] },
+              internshipDuration: { type: 'string', example: '6 months' },
+              locationType: { type: 'array', items: { type: 'string' }, example: ['onsite', 'hybrid'] },
+              locationCities: { type: 'array', items: { type: 'string' }, example: ['Bangalore', 'Gurugram'] },
               jobDescription: { type: 'string' },
               requiredSkills: { type: 'array', items: { type: 'string' } },
               goodToHaveSkills: { type: 'array', items: { type: 'string' } },
-              salaryPackage: { type: 'string' },
+              salaryType: { type: 'string', enum: ['fixed', 'range', 'not_decided'] },
+              salaryFixed: { type: 'string', example: '12 LPA' },
+              salaryMin: { type: 'string', example: '8 LPA' },
+              salaryMax: { type: 'string', example: '14 LPA' },
+              salaryBreakdown: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    component: { type: 'string', example: 'Base Salary' },
+                    value: { type: 'string', example: '80%' },
+                  },
+                },
+              },
               probationPeriod: { type: 'string' },
               bondPeriod: { type: 'string' },
               bondAmount: { type: 'string' },
+              additionalDetails: { type: 'string' },
             },
           },
           eligibilityCriteria: {
@@ -509,15 +530,29 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
               maxAge: { type: 'integer' },
             },
           },
-          collegeSelection: {
+          interviewConfig: {
             type: 'object',
             properties: {
-              locations: { type: 'array', items: { type: 'string' } },
-              universityTypes: { type: 'array', items: { type: 'string' } },
+              numberOfRounds: { type: 'integer' },
+              rounds: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/InterviewRound' },
+              },
             },
           },
-          schedulingDetails: { type: 'object', additionalProperties: {} },
           customFields: { type: 'object', additionalProperties: {} },
+        },
+      },
+
+      InterviewRound: {
+        type: 'object',
+        properties: {
+          roundNumber: { type: 'integer' },
+          roundType: { type: 'string', enum: ['online_aptitude', 'coding_assessment', 'technical_interview', 'group_discussion', 'system_design', 'managerial_interview', 'hr_interview', 'custom'] },
+          roundTitle: { type: 'string', example: 'Round 1: Screening Test' },
+          duration: { type: 'string', example: '60 minutes' },
+          venue: { type: 'string', enum: ['online', 'onsite', 'hybrid_tbd'] },
+          description: { type: 'string' },
         },
       },
 
@@ -529,12 +564,19 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
           id: { type: 'string', description: 'Unique question identifier' },
           field: { type: 'string', description: 'Dot-path to DriveData field', example: 'setupDetails.candidateType' },
           question: { type: 'string', description: 'Human-readable question text' },
-          type: { type: 'string', enum: ['single_select', 'multi_select', 'text', 'number', 'date'] },
+          type: { type: 'string', enum: ['single_select', 'multi_select', 'text', 'number', 'date', 'toggle', 'tag_input'] },
           options: {
             type: 'array',
             items: { $ref: '#/components/schemas/QuestionOption' },
           },
+          suggestedOptions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'AI-generated suggestions shown as chips alongside free-form input',
+          },
           required: { type: 'boolean' },
+          description: { type: 'string', description: 'Helper text shown below the question' },
+          warning: { type: 'string', description: 'Immutability or important warning text' },
           defaultValue: {},
           validation: {
             type: 'object',

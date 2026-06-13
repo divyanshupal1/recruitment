@@ -6,7 +6,7 @@ import { nowISO } from '../lib/time.js';
 import { ALLOWED_MIME_TYPES } from '../lib/constants.js';
 import { chatRepository } from '../repositories/chat.repository.js';
 import { fileRepository } from '../repositories/file.repository.js';
-import { parseJDFromFile } from './gemini.js';
+import { parseDocumentFromFile } from './gemini.js';
 import { messageService } from './message.service.js';
 import { storageService } from './storage.service.js';
 import type { Chat, UploadedFile } from '../types/chat.js';
@@ -23,7 +23,7 @@ export const fileService = {
   async uploadAndParse(chat: Chat, file: File): Promise<FileUploadResult> {
     if (!ALLOWED_MIME_TYPES.includes(file.type as (typeof ALLOWED_MIME_TYPES)[number])) {
       throw new BadRequestError(
-        `Unsupported file type: ${file.type}. Allowed: PDF, DOC, DOCX`
+        `Unsupported file type: ${file.type}. Allowed: PDF, DOC, DOCX, PNG, JPG`
       );
     }
 
@@ -43,12 +43,12 @@ export const fileService = {
     let parseWarning: string | undefined;
 
     try {
-      const parseResult = await parseJDFromFile(fileBuffer, file.type, file.name);
+      const parseResult = await parseDocumentFromFile(fileBuffer, file.type, file.name);
       parsedData = parseResult.parsedData;
-      console.log('[FileService] JD parsed successfully via Gemini');
+      console.log('[FileService] Document parsed successfully via Gemini');
     } catch (parseError) {
       parseWarning = String(parseError);
-      console.error('[FileService] JD parsing failed:', parseWarning);
+      console.error('[FileService] Document parsing failed:', parseWarning);
     }
 
     const uploadedFile: UploadedFile = {

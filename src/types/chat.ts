@@ -16,6 +16,7 @@ export const ChatSchema = z.object({
   updatedAt: z.string(),
   status: ChatStatusSchema,
   driveData: DriveDataSchema.nullable().optional(),
+  answeredFields: z.record(z.unknown()).nullable().optional(), // Tracks all answered/skipped fields
 });
 
 export type Chat = z.infer<typeof ChatSchema>;

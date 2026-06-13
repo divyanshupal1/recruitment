@@ -10,6 +10,8 @@ export const QuestionTypeSchema = z.enum([
   'text',
   'number',
   'date',
+  'toggle',    // Yes/No toggle (e.g., "Do you have a target joining date?")
+  'tag_input', // Free-form tag entry with suggestions (e.g., skills, cities)
 ]);
 export type QuestionType = z.infer<typeof QuestionTypeSchema>;
 
@@ -46,10 +48,13 @@ export const QuestionSchema = z.object({
   field: z.string(),
   question: z.string(),
   type: QuestionTypeSchema,
-  options: z.array(QuestionOptionSchema).optional(),
+  options: z.array(QuestionOptionSchema).nullable().optional(),
+  suggestedOptions: z.array(z.string()).nullable().optional(), // AI-generated suggestions for free-form fields
   required: z.boolean(),
   defaultValue: z.unknown().optional(),
   validation: QuestionValidationSchema.optional(),
+  description: z.string().nullable().optional(), // Helper text shown below the question
+  warning: z.string().nullable().optional(), // Immutability or important warnings
 });
 
 export type Question = z.infer<typeof QuestionSchema>;

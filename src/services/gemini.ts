@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import type { DriveData } from '../types/drive.js';
 import type { Question } from '../types/question.js';
 import {
-  JD_PARSING_PROMPT,
+  DOCUMENT_PARSING_PROMPT,
   QUESTION_GENERATION_PROMPT,
   DRIVE_FINALIZATION_PROMPT,
 } from '../lib/prompts.js';
@@ -17,6 +17,10 @@ const genAI = new GoogleGenerativeAI(apiKey);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
+// ==========================================
+// Gemini Response Schemas
+// ==========================================
+
 const DRIVE_DATA_RESPONSE_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
@@ -24,12 +28,19 @@ const DRIVE_DATA_RESPONSE_SCHEMA = {
       type: SchemaType.OBJECT,
       properties: {
         candidateType: { type: SchemaType.STRING, nullable: true },
-        experience: { type: SchemaType.STRING, nullable: true },
-        positionTitles: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
+        positionTitle: { type: SchemaType.STRING, nullable: true },
         numberOfVacancies: { type: SchemaType.NUMBER, nullable: true },
-        jobTitle: { type: SchemaType.STRING, nullable: true },
-        preferredYearOfGraduation: { type: SchemaType.NUMBER, nullable: true },
-        targetJoiningDate: { type: SchemaType.STRING, nullable: true },
+        driveTitle: { type: SchemaType.STRING, nullable: true },
+        preferredYearOfGraduation: { type: SchemaType.ARRAY, items: { type: SchemaType.NUMBER }, nullable: true },
+        targetJoiningTimeframe: {
+          type: SchemaType.OBJECT,
+          properties: {
+            hasTarget: { type: SchemaType.BOOLEAN, nullable: true },
+            format: { type: SchemaType.STRING, nullable: true },
+            value: { type: SchemaType.STRING, nullable: true },
+          },
+          nullable: true,
+        },
       },
       nullable: true,
     },
@@ -37,15 +48,32 @@ const DRIVE_DATA_RESPONSE_SCHEMA = {
       type: SchemaType.OBJECT,
       properties: {
         employmentType: { type: SchemaType.STRING, nullable: true },
-        locationType: { type: SchemaType.STRING, nullable: true },
-        locationDetails: { type: SchemaType.STRING, nullable: true },
+        internshipDuration: { type: SchemaType.STRING, nullable: true },
+        locationType: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
+        locationCities: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
         jobDescription: { type: SchemaType.STRING, nullable: true },
         requiredSkills: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
         goodToHaveSkills: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
-        salaryPackage: { type: SchemaType.STRING, nullable: true },
+        salaryType: { type: SchemaType.STRING, nullable: true },
+        salaryFixed: { type: SchemaType.STRING, nullable: true },
+        salaryMin: { type: SchemaType.STRING, nullable: true },
+        salaryMax: { type: SchemaType.STRING, nullable: true },
+        salaryBreakdown: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              component: { type: SchemaType.STRING },
+              value: { type: SchemaType.STRING },
+            },
+            required: ['component', 'value'],
+          },
+          nullable: true,
+        },
         probationPeriod: { type: SchemaType.STRING, nullable: true },
         bondPeriod: { type: SchemaType.STRING, nullable: true },
         bondAmount: { type: SchemaType.STRING, nullable: true },
+        additionalDetails: { type: SchemaType.STRING, nullable: true },
       },
       nullable: true,
     },
@@ -72,17 +100,32 @@ const DRIVE_DATA_RESPONSE_SCHEMA = {
       },
       nullable: true,
     },
-    collegeSelection: {
+    interviewConfig: {
       type: SchemaType.OBJECT,
       properties: {
-        locations: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
-        universityTypes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
+        numberOfRounds: { type: SchemaType.NUMBER, nullable: true },
+        rounds: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              roundNumber: { type: SchemaType.NUMBER },
+              roundType: { type: SchemaType.STRING, nullable: true },
+              roundTitle: { type: SchemaType.STRING, nullable: true },
+              duration: { type: SchemaType.STRING, nullable: true },
+              venue: { type: SchemaType.STRING, nullable: true },
+              description: { type: SchemaType.STRING, nullable: true },
+            },
+            required: ['roundNumber'],
+          },
+          nullable: true,
+        },
       },
       nullable: true,
     },
     customFields: {
       type: SchemaType.OBJECT,
-      description: 'Any additional fields extracted from the JD that do not fit standard categories',
+      description: 'Any additional fields extracted that do not fit standard categories',
       nullable: true,
     },
   },
@@ -102,7 +145,7 @@ const QUESTIONS_RESPONSE_SCHEMA = {
           type: {
             type: SchemaType.STRING,
             description: 'Question input type',
-            enum: ['single_select', 'multi_select', 'text', 'number', 'date'],
+            enum: ['single_select', 'multi_select', 'text', 'number', 'date', 'toggle', 'tag_input'],
           },
           options: {
             type: SchemaType.ARRAY,
@@ -118,18 +161,30 @@ const QUESTIONS_RESPONSE_SCHEMA = {
             nullable: true,
             description: 'Options for single_select and multi_select types',
           },
+          suggestedOptions: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+            nullable: true,
+            description: 'AI-generated suggestions shown as chips alongside free-form input',
+          },
           required: { type: SchemaType.BOOLEAN, description: 'Whether this question must be answered' },
+          description: { type: SchemaType.STRING, nullable: true, description: 'Helper text shown below the question' },
+          warning: { type: SchemaType.STRING, nullable: true, description: 'Immutability or important warning text' },
         },
         required: ['id', 'field', 'question', 'type', 'required'],
       },
     },
     summary: {
       type: SchemaType.STRING,
-      description: 'A brief summary of what data was found and what is still missing',
+      description: 'A brief summary of current state and what is still needed',
     },
   },
   required: ['questions', 'summary'],
 };
+
+// ==========================================
+// Helper
+// ==========================================
 
 async function generateStructuredJson<T>(parts: Part[], schema: Schema): Promise<T> {
   const result = await model.generateContent({
@@ -143,29 +198,41 @@ async function generateStructuredJson<T>(parts: Part[], schema: Schema): Promise
   return JSON.parse(result.response.text()) as T;
 }
 
-export async function parseJDFromFile(
+// ==========================================
+// Core AI Functions
+// ==========================================
+
+/**
+ * Parse any uploaded document (JD, policy doc, benefits sheet, etc.) using Gemini inline data.
+ */
+export async function parseDocumentFromFile(
   fileBuffer: Buffer,
   mimeType: string,
   fileName: string
 ): Promise<{ parsedData: Partial<DriveData> }> {
   const base64Data = fileBuffer.toString('base64');
 
-  console.log(`[Gemini] Parsing JD via inline data: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
+  console.log(`[Gemini] Parsing document via inline data: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
 
   const parsedData = await generateStructuredJson<Partial<DriveData>>(
     [
       { inlineData: { mimeType, data: base64Data } } as Part,
-      { text: JD_PARSING_PROMPT },
+      { text: DOCUMENT_PARSING_PROMPT },
     ],
     DRIVE_DATA_RESPONSE_SCHEMA as Schema
   );
 
-  console.log('[Gemini] JD parsed successfully');
+  console.log('[Gemini] Document parsed successfully');
   return { parsedData };
 }
 
+/**
+ * Generate clarification questions for missing fields.
+ * Tracks answered fields to avoid repeating questions.
+ */
 export async function generateClarificationQuestions(
   driveData: Partial<DriveData>,
+  answeredFields?: string[],
   previousAnswers?: Record<string, unknown>
 ): Promise<{ questions: Question[]; summary: string }> {
   const contextParts: string[] = [
@@ -173,11 +240,19 @@ export async function generateClarificationQuestions(
     '\n\n## Current Drive Data State\n```json\n' + JSON.stringify(driveData, null, 2) + '\n```',
   ];
 
+  if (answeredFields && answeredFields.length > 0) {
+    contextParts.push(
+      '\n\n## Already Answered/Skipped Fields (DO NOT ask about these)\n' +
+        answeredFields.map((f) => `- ${f}`).join('\n') +
+        '\n\nThese fields have been answered or explicitly skipped by the user. Do NOT generate questions for any of them or their dependent fields.'
+    );
+  }
+
   if (previousAnswers && Object.keys(previousAnswers).length > 0) {
     contextParts.push(
-      '\n\n## Previously Provided Answers\n```json\n' +
+      '\n\n## Latest Answers Just Provided\n```json\n' +
         JSON.stringify(previousAnswers, null, 2) +
-        '\n```\nDo not ask questions for fields that have already been answered above.'
+        '\n```\nUse these to determine which dependent fields to ask next or skip.'
     );
   }
 
@@ -190,6 +265,9 @@ export async function generateClarificationQuestions(
   return parsed;
 }
 
+/**
+ * Generate the finalized, complete drive data.
+ */
 export async function generateFinalDriveData(
   driveData: Partial<DriveData>
 ): Promise<Partial<DriveData>> {
@@ -198,7 +276,7 @@ export async function generateFinalDriveData(
       {
         text:
           DRIVE_FINALIZATION_PROMPT +
-          '\n\n## Current Drive Data (merge of JD parsing + user answers)\n```json\n' +
+          '\n\n## Current Drive Data (merge of all sources + user answers)\n```json\n' +
           JSON.stringify(driveData, null, 2) +
           '\n```\n\nProduce the final, complete, and clean DriveData object.',
       },
