@@ -196,7 +196,8 @@ for q in qs:
         "positionDetails.salaryType": "range",
         "positionDetails.salaryMin": "8 LPA",
         "positionDetails.salaryMax": "14 LPA",
-        "eligibilityCriteria.eligibleCourses": ["B.Tech (CSE)", "B.Tech (ECE)", "M.Tech (CSE)", "MCA"]
+        "eligibilityCriteria.eligibleCourses": ["B.Tech (CSE)", "B.Tech (ECE)", "M.Tech (CSE)", "MCA"],
+        "eligibilityCriteria.academicCriteria.graduationMarks": 60
       }
     }')
 

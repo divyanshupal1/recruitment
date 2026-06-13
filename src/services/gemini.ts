@@ -6,6 +6,8 @@ import {
   DOCUMENT_PARSING_PROMPT,
   QUESTION_GENERATION_PROMPT,
   DRIVE_FINALIZATION_PROMPT,
+  QUESTIONS_VERIFICATION_PROMPT,
+  DRIVE_VERIFICATION_PROMPT,
 } from '../lib/prompts.js';
 
 const apiKey = process.env.GOOGLE_API_KEY;
@@ -286,4 +288,79 @@ export async function generateFinalDriveData(
 
   console.log('[Gemini] Final drive data generated');
   return finalData;
+}
+
+function serializeMessagesForVerification(messages: any[]): string {
+  return messages
+    .map((m) => {
+      let text = `[${m.role.toUpperCase()}] (${m.type}): ${m.content}`;
+      if (m.answers && Object.keys(m.answers).length > 0) {
+        text += `\nAnswers provided:\n${JSON.stringify(m.answers, null, 2)}`;
+      }
+      if (m.questions && m.questions.length > 0) {
+        text += `\nQuestions asked:\n${JSON.stringify(m.questions.map((q: any) => q.question), null, 2)}`;
+      }
+      return text;
+    })
+    .join('\n\n');
+}
+
+/**
+ * Verify proposed clarification questions using a second verifier pass.
+ */
+export async function verifyClarificationQuestions(
+  driveData: Partial<DriveData>,
+  answeredFields: string[],
+  proposedQuestions: Question[],
+  proposedSummary: string,
+  messages: any[]
+): Promise<{ questions: Question[]; summary: string }> {
+  const serializedHistory = serializeMessagesForVerification(messages);
+
+  const contextParts: string[] = [
+    QUESTIONS_VERIFICATION_PROMPT,
+    '\n\n## Conversation History\n' + (serializedHistory || 'No previous history.'),
+    '\n\n## Current Drive Data State\n```json\n' + JSON.stringify(driveData, null, 2) + '\n```',
+    '\n\n## Already Answered/Skipped Fields\n' + (answeredFields.length > 0 ? answeredFields.map((f) => `- ${f}`).join('\n') : 'None.'),
+    '\n\n## Proposed Clarification Questions\n```json\n' + JSON.stringify(proposedQuestions, null, 2) + '\n```',
+    '\n\n## Proposed Summary\n' + proposedSummary,
+  ];
+
+  console.log('[Gemini QA Agent] Running verification call on proposed questions...');
+
+  const verified = await generateStructuredJson<{ questions: Question[]; summary: string }>(
+    [{ text: contextParts.join('') }],
+    QUESTIONS_RESPONSE_SCHEMA as Schema
+  );
+
+  console.log(`[Gemini QA Agent] Verification complete. Proposed: ${proposedQuestions.length} questions. Verified: ${verified.questions.length} questions.`);
+  return verified;
+}
+
+/**
+ * Verify and clean up proposed final drive data using a second verifier pass.
+ */
+export async function verifyFinalDriveData(
+  driveData: Partial<DriveData>,
+  finalDriveData: Partial<DriveData>,
+  messages: any[]
+): Promise<Partial<DriveData>> {
+  const serializedHistory = serializeMessagesForVerification(messages);
+
+  const contextParts: string[] = [
+    DRIVE_VERIFICATION_PROMPT,
+    '\n\n## Conversation History\n' + (serializedHistory || 'No previous history.'),
+    '\n\n## Input Drive Data State\n```json\n' + JSON.stringify(driveData, null, 2) + '\n```',
+    '\n\n## Proposed Finalized Drive Data\n```json\n' + JSON.stringify(finalDriveData, null, 2) + '\n```',
+  ];
+
+  console.log('[Gemini QA Agent] Running verification call on proposed final drive data...');
+
+  const verifiedData = await generateStructuredJson<Partial<DriveData>>(
+    [{ text: contextParts.join('') }],
+    DRIVE_DATA_RESPONSE_SCHEMA as Schema
+  );
+
+  console.log('[Gemini QA Agent] Final drive data verification complete');
+  return verifiedData;
 }
