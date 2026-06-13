@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { swaggerUI } from '@hono/swagger-ui';
+import { serveStatic } from '@hono/node-server/serve-static';
 
 import chats from './routes/chats.js';
 import files from './routes/files.js';
@@ -80,6 +81,9 @@ app.route('/api/chats', files);
 
 // Drive generation (mounted under /api/chats so :chatId is accessible)
 app.route('/api/chats', generate);
+
+// Serve static assets from public directory
+app.use('/*', serveStatic({ root: './public' }));
 
 // ==========================================
 // Global Error Handler

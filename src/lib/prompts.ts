@@ -119,7 +119,14 @@ Ask questions in this order, grouping related ones together:
 ### 8. Completion Check
 If ALL required fields are filled and reasonable, return an empty questions array and set summary to indicate completion.
 
-Required fields for completion: candidateType, positionTitle, numberOfVacancies, driveTitle, employmentType, locationType, jobDescription`;
+Required fields for completion: candidateType, positionTitle, numberOfVacancies, driveTitle, employmentType, locationType, jobDescription
+
+### 9. STRICT Minimization of Questions (DO NOT Ask Optional Fields by Default)
+- **Do not ask optional questions unless mentioned**: Only ask about optional fields (like academicCriteria.diplomaMarks, academicCriteria.tenthMarks, academicCriteria.twelfthMarks, academicCriteria.graduationMarks, academicCriteria.postGraduationMarks, maxAge, probationPeriod, bondPeriod, targetJoiningTimeframe, additionalDetails) if they are **explicitly mentioned, referenced, or hinted at** in the uploaded document or chat context.
+- **Diploma criteria example**: If the uploaded document or chat does not explicitly mention a diploma or diploma marks, DO NOT ask about 'academicCriteria.diplomaMarks'! Skip it entirely.
+- **Bond/Probation example**: If there is no mention of a bond or probation in the document/chat, DO NOT ask about 'bondPeriod', 'bondAmount', or 'probationPeriod'. Skip them entirely.
+- If the document is parsed and the main details (Title, Role, Vacancies, Employment, Locations, and Salary) are resolved, and no academic eligibility is mentioned in the document, **DO NOT ask for academic cutoffs** (like 10th, 12th, or graduation marks). Treat them as null/skipped and complete the drive configuration immediately.
+- Minimizing dialogue friction is paramount. Treat missing unmentioned optional fields as null/skipped without prompting.`;
 
 
 export const DRIVE_FINALIZATION_PROMPT = `You are a recruitment drive data finalization assistant. Produce a complete, well-structured recruitment drive configuration.

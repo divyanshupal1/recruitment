@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recruitment Drive Agent</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="minimal-light">
+  
+  <div class="app-wrapper">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <div class="logo">
+          <i data-lucide="sparkles" class="logo-icon"></i>
+          <span>RecruitAgent</span>
+        </div>
+        <div class="drive-select-wrapper">
+          <select id="drive-selector" class="select-selector">
+            <option value="">Select a drive...</option>
+          </select>
+          <button id="btn-new-chat-top" class="btn btn-black btn-sm">
+            <i data-lucide="plus"></i> New Drive
+          </button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="api-config-compact">
+          <input type="text" id="api-url-input" placeholder="http://localhost:3000">
+          <button id="btn-save-api" class="btn btn-white btn-sm" title="Save API URL">
+            <i data-lucide="save"></i>
+          </button>
+        </div>
+        <button id="btn-refresh-chat" class="btn btn-white btn-sm" title="Refresh UI">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="workspace-grid">
+      
+      <!-- Welcome Screen (Overlay if no active chat) -->
+      <section class="welcome-screen" id="welcome-screen">
+        <div class="welcome-card">
+          <div class="welcome-icon-wrapper">
+            <i data-lucide="bot" class="welcome-icon"></i>
+          </div>
+          <h1>Recruitment Drive Agent</h1>
+          <p>Configure structured, compliant recruitment drives in minutes. Upload a document or chat with the AI agent to start.</p>
+          <div class="welcome-actions">
+            <button id="btn-welcome-create" class="btn btn-black btn-lg">
+              <i data-lucide="plus-circle"></i> Create New Drive
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Workspace Layout (Left: Preview & Forms, Right: Chat) -->
+      <div class="workspace-active-container" id="workspace-active" style="display: none;">
+        
+        <!-- Left Panel: Preview & Q&A Forms -->
+        <section class="preview-panel" id="preview-panel">
+          
+          <!-- Success Completion Banner (from screenshot) -->
+          <div class="success-banner hidden" id="success-banner">
+            <div class="banner-content">
+              <div class="banner-icon-circle">
+                <i data-lucide="check"></i>
+              </div>
+              <div class="banner-text">
+                <h2>PLACEMENT DRIVE CREATED SUCCESSFULLY</h2>
+                <p>All configurations are compiled, compliant, and cataloged. This drive has active live enrollment targets!</p>
+              </div>
+            </div>
+            <button id="btn-export-json" class="btn btn-white btn-sm">
+              <i data-lucide="download"></i> Export JSON
+            </button>
+          </div>
+
+          <!-- Quick Stats Row (from screenshot) -->
+          <div class="stats-row" id="stats-row">
+            <div class="stat-card">
+              <div class="stat-icon target-candidates-icon">
+                <i data-lucide="users"></i>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">Target Candidates</span>
+                <span class="stat-value" id="stat-candidates">--</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon compensation-icon">
+                <i data-lucide="dollar-sign"></i>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">Compensation</span>
+                <span class="stat-value" id="stat-compensation">--</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon joining-date-icon">
+                <i data-lucide="calendar"></i>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">Joining Date</span>
+                <span class="stat-value" id="stat-joining">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Questions Modal is now placed as a full-screen overlay at the bottom of the body -->
+
+          <!-- Spec Sheets List -->
+          <div class="sheets-list">
+            
+            <!-- 1. General Setup Detail Sheet -->
+            <div class="sheet-card" id="sheet-setup">
+              <div class="sheet-header">
+                <div class="sheet-title">
+                  <div class="check-circle-indicator active">
+                    <i data-lucide="check"></i>
+                  </div>
+                  <span>1. GENERAL SETUP DETAIL SHEET</span>
+                </div>
+                <span class="sheet-status" id="badge-setup">Empty</span>
+              </div>
+              <div class="sheet-divider"></div>
+              <div class="sheet-body" id="spec-setup-body">
+                <div class="spec-placeholder">No setup details configured.</div>
+              </div>
+            </div>
+
+            <!-- 2. Role and Workplace Parameters Sheet -->
+            <div class="sheet-card" id="sheet-position">
+              <div class="sheet-header">
+                <div class="sheet-title">
+                  <div class="check-circle-indicator">
+                    <i data-lucide="check"></i>
+                  </div>
+                  <span>2. ROLE AND WORKPLACE PARAMETERS</span>
+                </div>
+                <span class="sheet-status" id="badge-position">Empty</span>
+              </div>
+              <div class="sheet-divider"></div>
+              <div class="sheet-body" id="spec-position-body">
+                <div class="spec-placeholder">No position details configured.</div>
+              </div>
+            </div>
+
+            <!-- 3. Eligibility Criteria Sheet -->
+            <div class="sheet-card" id="sheet-eligibility">
+              <div class="sheet-header">
+                <div class="sheet-title">
+                  <div class="check-circle-indicator">
+                    <i data-lucide="check"></i>
+                  </div>
+                  <span>3. ELIGIBILITY CRITERIA SPECIFICATION</span>
+                </div>
+                <span class="sheet-status" id="badge-eligibility">Empty</span>
+              </div>
+              <div class="sheet-divider"></div>
+              <div class="sheet-body" id="spec-eligibility-body">
+                <div class="spec-placeholder">No eligibility criteria configured.</div>
+              </div>
+            </div>
+
+            <!-- 4. Interview Rounds Config Sheet -->
+            <div class="sheet-card" id="sheet-interview">
+              <div class="sheet-header">
+                <div class="sheet-title">
+                  <div class="check-circle-indicator">
+                    <i data-lucide="check"></i>
+                  </div>
+                  <span>4. INTERVIEW ROUNDS CONFIGURATION</span>
+                </div>
+                <span class="sheet-status" id="badge-interview">Empty</span>
+              </div>
+              <div class="sheet-divider"></div>
+              <div class="sheet-body" id="spec-interview-body">
+                <div class="spec-placeholder">No interview rounds configured.</div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Right Panel: Chat Feed -->
+        <section class="chat-panel" id="chat-panel">
+          <!-- Messages -->
+          <div class="message-feed" id="message-feed">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Bottom Inputs -->
+          <div class="chat-input-area">
+            <!-- Drag & Drop Uploader -->
+            <div class="upload-zone" id="upload-zone">
+              <input type="file" id="file-input" class="file-hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+              <div class="upload-content" id="upload-content-normal">
+                <i data-lucide="file-text"></i>
+                <span>Attach a file (PDF, DOCX, Image) to parse details</span>
+              </div>
+              <div class="upload-content hidden" id="upload-content-loading">
+                <div class="spinner"></div>
+                <span>Parsing file via Gemini AI...</span>
+              </div>
+            </div>
+
+            <div class="input-row">
+              <input type="text" id="chat-text-input" placeholder="Type a message or request adjustments...">
+              <button id="btn-send-message" class="btn btn-black" title="Send Message">
+                <i data-lucide="send"></i>
+              </button>
+              <button id="btn-generate-drive" class="btn btn-white" title="Auto-Generate Drive">
+                <i data-lucide="sparkles"></i> Generate
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Full-screen Non-dismissible Questions Modal Overlay -->
+  <div class="modal-overlay hidden" id="qa-form-container">
+    <div class="modal-card">
+      <div class="qa-form-header">
+        <div class="qa-header-title">
+          <i data-lucide="help-circle" class="qa-icon"></i>
+          <h4>AI CLARIFICATION REQUIRED</h4>
+        </div>
+        <span class="qa-round-badge">Round <span id="qa-round-num">1</span></span>
+      </div>
+      <p class="qa-summary" id="qa-summary">Please clarify these fields to complete the recruitment drive configuration sheet.</p>
+      <form id="dynamic-qa-form" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+        <div class="qa-fields-grid" id="qa-fields">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="qa-actions">
+          <button type="submit" id="btn-submit-answers" class="btn btn-black w-full">
+            Submit Answers & Update Preview <i data-lucide="arrow-right"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
