@@ -1306,3 +1306,34 @@ body {
   margin-bottom: 20px;
   padding-right: 8px;
 }
+
+.sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-card-large {
+  max-width: 800px;
+}
+
+.edit-round-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fafbfc;
+  transition: border-color var(--transition-fast);
+}
+
+.edit-round-card:hover {
+  border-color: var(--primary-black);
+}
+
+.edit-round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+

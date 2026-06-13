@@ -229,6 +229,42 @@ export async function parseDocumentFromFile(
 }
 
 /**
+ * Parse recruitment drive parameters from the user's text message.
+ */
+export async function parseDriveDetailsFromTextMessage(
+  message: string,
+  currentDriveData: Partial<DriveData>
+): Promise<Partial<DriveData>> {
+  console.log(`[Gemini] Parsing user message for drive details: "${message.substring(0, 60)}..."`);
+
+  const prompt = `You are an expert recruitment assistant. Extract any recruitment drive parameters from the user's message.
+Return only fields that are explicitly specified or can be clearly and logically inferred from the user's message.
+Do not hallucinate or guess any values not mentioned.
+If a value is not mentioned or cannot be determined, set it to null or omit it.
+
+Existing drive data for context (do not modify existing fields unless the user's message explicitly updates them):
+${JSON.stringify(currentDriveData, null, 2)}
+
+User's message:
+"${message}"`;
+
+  try {
+    const parsedData = await generateStructuredJson<Partial<DriveData>>(
+      [
+        { text: prompt },
+        { text: DOCUMENT_PARSING_PROMPT }
+      ],
+      DRIVE_DATA_RESPONSE_SCHEMA as Schema
+    );
+    return parsedData || {};
+  } catch (err) {
+    console.error('Failed to parse user message for drive details:', err);
+    return {};
+  }
+}
+
+
+/**
  * Generate clarification questions for missing fields.
  * Tracks answered fields to avoid repeating questions.
  */

@@ -132,7 +132,12 @@
                   </div>
                   <span>1. GENERAL SETUP DETAIL SHEET</span>
                 </div>
-                <span class="sheet-status" id="badge-setup">Empty</span>
+                <div class="sheet-actions">
+                  <span class="sheet-status" id="badge-setup">Empty</span>
+                  <button class="btn btn-white btn-xs btn-edit-section hidden" id="btn-edit-setup" data-section="setup" type="button">
+                    <i data-lucide="edit-2"></i> Edit
+                  </button>
+                </div>
               </div>
               <div class="sheet-divider"></div>
               <div class="sheet-body" id="spec-setup-body">
@@ -149,7 +154,12 @@
                   </div>
                   <span>2. ROLE AND WORKPLACE PARAMETERS</span>
                 </div>
-                <span class="sheet-status" id="badge-position">Empty</span>
+                <div class="sheet-actions">
+                  <span class="sheet-status" id="badge-position">Empty</span>
+                  <button class="btn btn-white btn-xs btn-edit-section hidden" id="btn-edit-position" data-section="position" type="button">
+                    <i data-lucide="edit-2"></i> Edit
+                  </button>
+                </div>
               </div>
               <div class="sheet-divider"></div>
               <div class="sheet-body" id="spec-position-body">
@@ -166,7 +176,12 @@
                   </div>
                   <span>3. ELIGIBILITY CRITERIA SPECIFICATION</span>
                 </div>
-                <span class="sheet-status" id="badge-eligibility">Empty</span>
+                <div class="sheet-actions">
+                  <span class="sheet-status" id="badge-eligibility">Empty</span>
+                  <button class="btn btn-white btn-xs btn-edit-section hidden" id="btn-edit-eligibility" data-section="eligibility" type="button">
+                    <i data-lucide="edit-2"></i> Edit
+                  </button>
+                </div>
               </div>
               <div class="sheet-divider"></div>
               <div class="sheet-body" id="spec-eligibility-body">
@@ -183,7 +198,12 @@
                   </div>
                   <span>4. INTERVIEW ROUNDS CONFIGURATION</span>
                 </div>
-                <span class="sheet-status" id="badge-interview">Empty</span>
+                <div class="sheet-actions">
+                  <span class="sheet-status" id="badge-interview">Empty</span>
+                  <button class="btn btn-white btn-xs btn-edit-section hidden" id="btn-edit-interview" data-section="interview" type="button">
+                    <i data-lucide="edit-2"></i> Edit
+                  </button>
+                </div>
               </div>
               <div class="sheet-divider"></div>
               <div class="sheet-body" id="spec-interview-body">
@@ -251,6 +271,34 @@
         <div class="qa-actions">
           <button type="submit" id="btn-submit-answers" class="btn btn-black w-full">
             Submit Answers & Update Preview <i data-lucide="arrow-right"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Section Modal Overlay -->
+  <div class="modal-overlay hidden" id="edit-section-modal">
+    <div class="modal-card modal-card-large">
+      <div class="qa-form-header">
+        <div class="qa-header-title">
+          <i data-lucide="edit-3" class="qa-icon"></i>
+          <h4 id="edit-modal-title">EDIT CONFIGURATION</h4>
+        </div>
+        <button id="btn-close-edit-modal" class="btn btn-white btn-xs" title="Close" type="button" style="border: none; background: transparent; padding: 4px;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="edit-section-form" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+        <div class="qa-fields-grid" id="edit-fields">
+          <!-- Dynamically populated edit fields -->
+        </div>
+        <div class="qa-actions" style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+          <button type="button" id="btn-cancel-edit" class="btn btn-white">
+            Cancel
+          </button>
+          <button type="submit" id="btn-save-edit" class="btn btn-black">
+            Save Changes <i data-lucide="save"></i>
           </button>
         </div>
       </form>

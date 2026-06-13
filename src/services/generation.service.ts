@@ -7,6 +7,7 @@ import {
   generateFinalDriveData,
   verifyClarificationQuestions,
   verifyFinalDriveData,
+  parseDriveDetailsFromTextMessage,
 } from './gemini.js';
 import { messageService } from './message.service.js';
 import type { Chat } from '../types/chat.js';
@@ -92,6 +93,8 @@ export const generationService = {
 
     if (message && !answers) {
       await messageService.createUserMessage(chat.id, message, fileIds);
+      const extractedData = await parseDriveDetailsFromTextMessage(message, currentDriveData);
+      currentDriveData = mergeDriveData(currentDriveData, extractedData);
     }
 
     if (fileIds && fileIds.length > 0) {

@@ -43,6 +43,9 @@ export const chatRepository = {
     if (status) {
       update.status = status;
     }
+    if (driveData?.setupDetails?.driveTitle) {
+      update.title = driveData.setupDetails.driveTitle;
+    }
     await chatsCollection.doc(chatId).update(update);
   },
 };
