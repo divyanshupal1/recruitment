@@ -27,6 +27,7 @@ export const openApiSpec: OpenAPIV3 = {
     { name: 'Chats', description: 'Chat management' },
     { name: 'Files', description: 'File upload and listing' },
     { name: 'Generate', description: 'Drive data generation' },
+    { name: 'Prediction', description: 'Campus matching and college prediction for hiring drives' },
   ],
   paths: {
     '/': {
@@ -373,6 +374,44 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
         },
       },
     },
+
+    // ── College Prediction ───────────────────────────────────────────
+
+    '/api/predict-colleges': {
+      post: {
+        tags: ['Prediction'],
+        summary: 'Predict matching colleges',
+        operationId: 'predictColleges',
+        description:
+          'Returns ranked college matches based on branch, job type, CTC, region, and degree constraints. Results include match probability scoring and an AI-generated strategic briefing.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/PredictionConstraints' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Ranked list of matching colleges',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PredictionResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Missing required constraint fields',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 
   components: {
@@ -596,6 +635,113 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
           value: { type: 'string' },
           label: { type: 'string' },
           description: { type: 'string' },
+        },
+      },
+
+      // ── Prediction Schemas ──────────────────────────────────────────
+
+      PredictionConstraints: {
+        type: 'object',
+        required: ['required_branch', 'job_type', 'ctc', 'region_query', 'required_degree'],
+        properties: {
+          required_branch: {
+            type: 'string',
+            description: 'Target branch/discipline for the drive.',
+            example: 'CSE',
+          },
+          job_type: {
+            type: 'string',
+            enum: ['fresher', 'intern', 'lateral'],
+            description: 'Type of job the drive is targeting.',
+          },
+          ctc: {
+            type: 'number',
+            description: 'Offered CTC in LPA.',
+            example: 18.0,
+            minimum: 0,
+          },
+          region_query: {
+            type: 'string',
+            description: 'Region or location keyword (supports partial match: South, Tamil, Chennai, etc.).',
+            example: 'South',
+          },
+          required_degree: {
+            type: 'string',
+            description: 'Required degree type.',
+            example: 'B.Tech',
+          },
+        },
+      },
+
+      PredictedCollege: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'IR-E-U-0456' },
+          name: { type: 'string', example: 'Indian Institute of Technology Madras' },
+          type: { type: 'string', enum: ['IIT', 'NIT', 'Private', 'State', 'Deemed'], example: 'IIT' },
+          tier: { type: 'string', enum: ['Tier-1', 'Tier-2', 'Tier-3', 'Tier-4'], example: 'Tier-1' },
+          location: {
+            type: 'object',
+            properties: {
+              city: { type: 'string', example: 'Chennai' },
+              state: { type: 'string', example: 'Tamil Nadu' },
+              region: { type: 'string', example: 'South India' },
+            },
+          },
+          degrees: { type: 'array', items: { type: 'string' }, example: ['B.Tech'] },
+          branches: { type: 'array', items: { type: 'string' }, example: ['CSE', 'IT', 'ECE', 'ME', 'EE'] },
+          placement: {
+            type: 'object',
+            properties: {
+              avg_package_lpa: { type: 'number', example: 18.0 },
+              highest_package_lpa: { type: 'number', example: 27.0 },
+              placement_rate_percent: { type: 'number', example: 90.0 },
+              top_recruiters: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          drive_support: {
+            type: 'object',
+            properties: {
+              fresher: { type: 'boolean' },
+              intern: { type: 'boolean' },
+              lateral: { type: 'boolean' },
+            },
+          },
+          student_strength: {
+            type: 'object',
+            properties: {
+              total_students: { type: 'integer', example: 1000 },
+              eligible_per_year: { type: 'integer', example: 250 },
+            },
+          },
+          accreditation: { type: 'string', example: 'NBA' },
+          website: { type: 'string' },
+          match_probability: {
+            type: 'number',
+            description: 'Composite match score (0–100) based on budget fit and placement rate.',
+            example: 96.0,
+          },
+          category: {
+            type: 'string',
+            enum: ['High-Yield Tier', 'Balanced Tier', 'Reach Tier (Budget Deficit)'],
+            description: 'Drive-fit categorization based on scoring thresholds.',
+          },
+          ai_strategic_briefing: {
+            type: 'string',
+            description: 'AI-generated strategic recommendation for the matched campus set.',
+          },
+        },
+      },
+
+      PredictionResponse: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', example: 'success' },
+          total_campuses_found: { type: 'integer', example: 137 },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/PredictedCollege' },
+          },
         },
       },
     },

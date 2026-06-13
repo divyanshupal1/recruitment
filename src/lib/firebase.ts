@@ -59,6 +59,7 @@ export const bucket: ReturnType<ReturnType<typeof admin.storage>['bucket']> = ad
 
 // Collection references
 export const chatsCollection = db.collection('chats');
+export const collegesCollection = db.collection('colleges');
 
 export function chatFilesCollection(chatId: string) {
   return db.collection('chats').doc(chatId).collection('files');

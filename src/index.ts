@@ -8,6 +8,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import chats from './routes/chats.js';
 import files from './routes/files.js';
 import generate from './routes/generate.js';
+import predict from './routes/predict.js';
 import { openApiSpec } from './lib/openapi-spec.js';
 import { nowISO } from './lib/time.js';
 import { AppError } from './lib/errors.js';
@@ -82,6 +83,9 @@ app.route('/api/chats', files);
 // Drive generation (mounted under /api/chats so :chatId is accessible)
 app.route('/api/chats', generate);
 
+// College prediction
+app.route('/api', predict);
+
 // Serve static assets from public directory
 app.use('/*', serveStatic({ root: './public' }));
 
@@ -144,6 +148,7 @@ serve(
 ║   GET    /api/chats/:id/files                ║
 ║   POST   /api/chats/:id/generate             ║
 ║   GET    /api/chats/:id/drive-data           ║
+║   POST   /api/predict-colleges               ║
 ╚══════════════════════════════════════════════╝
     `);
   }

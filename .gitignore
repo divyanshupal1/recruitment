@@ -3,3 +3,4 @@ dist/
 .env
 serviceAccountKey.json
 *.log
+college-predictor-ph_kk_1/
