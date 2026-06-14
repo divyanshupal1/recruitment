@@ -83,7 +83,7 @@ app.route('/api/chats', files);
 // Drive generation (mounted under /api/chats so :chatId is accessible)
 app.route('/api/chats', generate);
 
-// College prediction
+// College prediction (standalone + chat-scoped)
 app.route('/api', predict);
 
 // Serve static assets from public directory

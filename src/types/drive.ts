@@ -143,6 +143,9 @@ export const DriveDataSchema = z.object({
   eligibilityCriteria: EligibilityCriteriaSchema.nullable().optional(),
   interviewConfig: InterviewConfigSchema.nullable().optional(),
   customFields: z.record(z.unknown()).nullable().optional(),
+  predictedColleges: z.array(z.any()).nullable().optional(),   // stored full college objects or lightweight refs
+  invitedColleges: z.array(z.string()).nullable().optional(),     // college IDs invited to the drive
+  aiStrategicBriefing: z.string().nullable().optional(),         // deduplicated AI briefing text
 });
 
 export type DriveData = z.infer<typeof DriveDataSchema>;

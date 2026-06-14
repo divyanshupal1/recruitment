@@ -6,6 +6,7 @@ import { messageService } from '../services/message.service.js';
 import { chatRepository } from '../repositories/chat.repository.js';
 import { CreateChatSchema, ListMessagesQuerySchema } from '../types/requests.js';
 import type { ChatVariables } from '../middleware/require-chat.js';
+import { hydrateDriveData } from '../services/prediction.service.js';
 
 export const createChat = withErrorHandling('Failed to create chat', async (c) => {
   const input = await parseJsonBody(c.req.raw, CreateChatSchema);
@@ -28,6 +29,10 @@ export const getChat = withErrorHandling('Failed to get chat', async (c) => {
 
   if (!chat) {
     return c.json({ error: 'Chat not found' }, 404);
+  }
+
+  if (chat.driveData) {
+    chat.driveData = await hydrateDriveData(chat.driveData);
   }
 
   return c.json({ chat });

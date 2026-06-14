@@ -1337,3 +1337,146 @@ body {
   margin-bottom: 12px;
 }
 
+/* ==========================================================================
+   Suggested Colleges Section (Left Pane)
+   ========================================================================== */
+
+.colleges-table-wrapper {
+  overflow-x: auto;
+  margin-top: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.colleges-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.colleges-table th {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background-color: var(--primary-light);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.colleges-table td {
+  font-size: 0.78rem;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+.colleges-table tr:last-child td {
+  border-bottom: none;
+}
+
+.colleges-table tr:hover {
+  background-color: #fafbfc;
+}
+
+.college-name {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.badge-tier {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f1f2f3;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.badge-match {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.match-high {
+  color: var(--success-green);
+}
+
+.match-mid {
+  color: var(--blue-brand);
+}
+
+.match-low {
+  color: var(--amber-brand);
+}
+
+.badge-category {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.cat-high {
+  background-color: var(--success-glow);
+  color: var(--success-green);
+}
+
+.cat-balanced {
+  background-color: var(--blue-bg);
+  color: var(--blue-brand);
+}
+
+.cat-reach {
+  background-color: var(--amber-bg);
+  color: var(--amber-brand);
+}
+
+.btn-invite-action {
+  font-weight: 600;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-invite-action.invite-ready {
+  background-color: var(--primary-black);
+  color: #ffffff;
+  border: 1px solid var(--primary-black);
+}
+
+.btn-invite-action.invite-ready:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-invite-action.invited {
+  background-color: var(--success-glow);
+  color: var(--success-green);
+  border: 1px solid var(--success-green);
+  cursor: default;
+}
+
+.prediction-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.prediction-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top: 2px solid var(--primary-black);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+

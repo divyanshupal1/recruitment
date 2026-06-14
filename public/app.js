@@ -13,6 +13,7 @@ const state = {
   tagInputsData: {}, // Keeps track of tags in tag inputs { [fieldPath]: string[] }
   isUploading: false,
   isGenerating: false,
+  predictedCollegesData: null,
 };
 
 // DOM Cache
@@ -56,12 +57,14 @@ const DOM = {
   badgePosition: document.getElementById('badge-position'),
   badgeEligibility: document.getElementById('badge-eligibility'),
   badgeInterview: document.getElementById('badge-interview'),
+  badgeColleges: document.getElementById('badge-colleges'),
 
   // Dashboard Bodies
   specSetupBody: document.getElementById('spec-setup-body'),
   specPositionBody: document.getElementById('spec-position-body'),
   specEligibilityBody: document.getElementById('spec-eligibility-body'),
   specInterviewBody: document.getElementById('spec-interview-body'),
+  specCollegesBody: document.getElementById('spec-colleges-body'),
 
   // Edit Section elements
   editSectionModal: document.getElementById('edit-section-modal'),
@@ -259,6 +262,16 @@ function resetWorkspace() {
 
   // Reset Q&A Form
   hideQAForm();
+
+  // Reset Suggested Colleges section
+  state.predictedCollegesData = null;
+  const collegesCard = document.getElementById('sheet-colleges');
+  if (collegesCard) {
+    collegesCard.style.display = 'none';
+    const checkEl = collegesCard.querySelector('.check-circle-indicator');
+    updateSectionStatus('colleges', '--', 'sheet-status', checkEl, false);
+  }
+  DOM.specCollegesBody.innerHTML = `<div class="spec-placeholder">No predictions yet.</div>`;
 }
 
 async function selectChat(chatId) {
@@ -987,6 +1000,17 @@ function renderDriveData() {
   renderPositionSection(dd.positionDetails);
   renderEligibilitySection(dd.eligibilityCriteria);
   renderInterviewSection(dd.interviewConfig);
+
+  // Suggested Colleges section rendering
+  const collegesCard = document.getElementById('sheet-colleges');
+  if (collegesCard) {
+    if (isCompleted) {
+      collegesCard.style.display = 'block';
+      triggerCollegesPrediction();
+    } else {
+      collegesCard.style.display = 'none';
+    }
+  }
 }
 
 function updateStatsRow(dd) {
@@ -2031,3 +2055,168 @@ async function handleEditFormSubmit(e) {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', initApp);
+
+async function triggerCollegesPrediction() {
+  const chatId = state.activeChatId;
+  if (!chatId) return;
+
+  // If we already have the full colleges list stored in driveData, use them directly
+  const storedColleges = state.driveData.predictedColleges;
+  if (storedColleges && storedColleges.length > 0 && typeof storedColleges[0] === 'object' && storedColleges[0].name) {
+    const checkEl = document.getElementById('sheet-colleges').querySelector('.check-circle-indicator');
+    updateSectionStatus('colleges', `${storedColleges.length} Matches`, 'sheet-status complete', checkEl, true);
+    renderCollegesSection(storedColleges, state.driveData.invitedColleges || []);
+    return;
+  }
+
+  // If we already have the colleges list cached, just render it.
+  if (state.predictedCollegesData) {
+    renderCollegesSection(state.predictedCollegesData, state.driveData.invitedColleges || []);
+    return;
+  }
+
+  // Otherwise, show loading spinner and fetch from API
+  const collegesCard = document.getElementById('sheet-colleges');
+  const checkEl = collegesCard.querySelector('.check-circle-indicator');
+  updateSectionStatus('colleges', 'Predicting...', 'sheet-status partial', checkEl, false);
+  
+  DOM.specCollegesBody.innerHTML = `
+    <div class="prediction-loading">
+      <div class="prediction-loading-spinner"></div>
+      <div>Analyzing constraints and predicting campuses...</div>
+    </div>
+  `;
+
+  try {
+    const res = await apiCall(`/api/chats/${chatId}/predict-colleges`, 'POST');
+    // Ensure we are still on the same chat
+    if (state.activeChatId !== chatId) return;
+
+    if (res.status === 'success') {
+      state.predictedCollegesData = res.data || [];
+      state.driveData.predictedColleges = res.predictedColleges || [];
+      state.driveData.invitedColleges = res.invitedColleges || [];
+      
+      const count = state.predictedCollegesData.length;
+      updateSectionStatus('colleges', `${count} Matches`, 'sheet-status complete', checkEl, true);
+      renderCollegesSection(state.predictedCollegesData, state.driveData.invitedColleges);
+    } else {
+      throw new Error(res.message || 'Failed to fetch predictions');
+    }
+  } catch (err) {
+    console.error('Error fetching colleges:', err);
+    if (state.activeChatId === chatId) {
+      updateSectionStatus('colleges', 'Error', 'sheet-status', checkEl, false);
+      DOM.specCollegesBody.innerHTML = `<div class="spec-placeholder" style="color: var(--amber-brand);">Failed to load college suggestions.</div>`;
+    }
+  }
+}
+
+function renderCollegesSection(colleges, invitedColleges = []) {
+  if (!colleges || colleges.length === 0) {
+    DOM.specCollegesBody.innerHTML = `<div class="spec-placeholder">No matching colleges found. Try broadening eligibility constraints.</div>`;
+    return;
+  }
+
+  let html = `
+    <div class="colleges-table-wrapper">
+      <table class="colleges-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Tier</th>
+            <th>Location</th>
+            <th>Avg Package</th>
+            <th>Match %</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  colleges.forEach(c => {
+    const isInvited = invitedColleges.includes(c.id);
+    const btnClass = isInvited ? 'btn-invite-action invited' : 'btn-invite-action invite-ready';
+    const btnText = isInvited ? 'Invited ✓' : 'Invite';
+    const disabledAttr = isInvited ? 'disabled' : '';
+
+    const matchVal = c.match_probability || 0;
+    let matchClass = 'match-low';
+    if (matchVal >= 85) matchClass = 'match-high';
+    else if (matchVal >= 60) matchClass = 'match-mid';
+
+    const city = c.location?.city || '';
+    const stateName = c.location?.state || '';
+    const locationStr = [city, stateName].filter(Boolean).join(', ') || 'Unknown';
+
+    html += `
+      <tr>
+        <td>
+          <div class="college-name">${c.name}</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 2px;">
+            ${c.type || ''} • Branches: ${(c.branches || []).join(', ')}
+          </div>
+        </td>
+        <td>
+          <span class="badge-tier">${c.tier || 'N/A'}</span>
+        </td>
+        <td>${locationStr}</td>
+        <td>${c.placement?.avg_package_lpa ? `${c.placement.avg_package_lpa} LPA` : 'N/A'}</td>
+        <td>
+          <span class="badge-match ${matchClass}">${matchVal}%</span>
+        </td>
+        <td>
+          <button class="${btnClass}" ${disabledAttr} onclick="inviteCollege('${c.id}', this)" type="button">
+            ${btnText}
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  DOM.specCollegesBody.innerHTML = html;
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+async function inviteCollege(collegeId, buttonEl) {
+  const chatId = state.activeChatId;
+  if (!chatId) return;
+
+  // Disable button and show spinner/loading state
+  buttonEl.disabled = true;
+  const originalText = buttonEl.innerHTML;
+  buttonEl.innerHTML = `Inviting...`;
+
+  try {
+    const res = await apiCall(`/api/chats/${chatId}/invite-college`, 'POST', { collegeId });
+    if (res.status === 'invited' || res.status === 'already_invited') {
+      // Add to local state if not exists
+      if (!state.driveData.invitedColleges) {
+        state.driveData.invitedColleges = [];
+      }
+      if (!state.driveData.invitedColleges.includes(collegeId)) {
+        state.driveData.invitedColleges.push(collegeId);
+      }
+      // Re-render button to "Invited ✓" state
+      buttonEl.className = 'btn-invite-action invited';
+      buttonEl.innerHTML = 'Invited ✓';
+    } else {
+      throw new Error(res.message || 'Invitation failed');
+    }
+  } catch (err) {
+    console.error('Error inviting college:', err);
+    buttonEl.disabled = false;
+    buttonEl.innerHTML = originalText;
+  }
+}
+
+// Expose functions to window for onclick handlers
+window.inviteCollege = inviteCollege;

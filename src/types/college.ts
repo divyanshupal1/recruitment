@@ -44,11 +44,13 @@ export interface College {
  * Constraints for the college prediction endpoint.
  */
 export interface PredictionConstraints {
-  required_branch: string;
-  job_type: 'fresher' | 'intern' | 'lateral';
-  ctc: number;
-  region_query: string;
-  required_degree: string;
+  required_branch?: string;
+  job_type?: 'fresher' | 'intern' | 'lateral';
+  ctc?: number;           // Fixed CTC (used when salary is a single value)
+  ctc_min?: number;       // Range lower bound (used when salary is a range)
+  ctc_max?: number;       // Range upper bound (used when salary is a range)
+  region_query?: string;
+  required_degree?: string;
 }
 
 /**

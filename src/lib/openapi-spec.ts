@@ -375,7 +375,76 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
       },
     },
 
-    // ── College Prediction ───────────────────────────────────────────
+    '/api/chats/{chatId}/predict-colleges': {
+      post: {
+        tags: ['Prediction'],
+        summary: 'Predict matching colleges for a completed drive',
+        description: 'Derives constraints from driveData, fetches matching colleges, stores predicted college IDs, and returns full college records.',
+        operationId: 'predictCollegesForChat',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        responses: {
+          '200': {
+            description: 'Ranked list of matching colleges and state',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'success' },
+                    total_campuses_found: { type: 'integer', example: 12 },
+                    predictedColleges: { type: 'array', items: { $ref: '#/components/schemas/PredictedCollege' } },
+                    invitedColleges: { type: 'array', items: { type: 'string' } },
+                    data: { type: 'array', items: { $ref: '#/components/schemas/PredictedCollege' } }
+                  }
+                }
+              }
+            }
+          },
+          '404': { $ref: '#/components/responses/NotFound' }
+        }
+      }
+    },
+
+    '/api/chats/{chatId}/invite-college': {
+      post: {
+        tags: ['Prediction'],
+        summary: 'Invite a college to the drive',
+        description: 'Adds the college ID to the invitedColleges array in driveData.',
+        operationId: 'inviteCollege',
+        parameters: [{ $ref: '#/components/parameters/ChatId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['collegeId'],
+                properties: {
+                  collegeId: { type: 'string', description: 'ID of college to invite' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: 'Invitation status and updated invitedColleges list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', enum: ['invited', 'already_invited'] },
+                    invitedColleges: { type: 'array', items: { type: 'string' } }
+                  }
+                }
+              }
+            }
+          },
+          '404': { $ref: '#/components/responses/NotFound' }
+        }
+      }
+    },
 
     '/api/predict-colleges': {
       post: {
@@ -580,6 +649,16 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
             },
           },
           customFields: { type: 'object', additionalProperties: {} },
+          predictedColleges: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/PredictedCollege' },
+            description: 'Predicted matching college objects'
+          },
+          invitedColleges: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'IDs of colleges invited to this drive'
+          },
         },
       },
 
@@ -642,7 +721,6 @@ Submit answers to previously asked questions by passing them in the \`answers\` 
 
       PredictionConstraints: {
         type: 'object',
-        required: ['required_branch', 'job_type', 'ctc', 'region_query', 'required_degree'],
         properties: {
           required_branch: {
             type: 'string',

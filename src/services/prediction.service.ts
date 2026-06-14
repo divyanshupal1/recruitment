@@ -10,6 +10,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { collegeRepository } from '../repositories/college.repository.js';
 import type { College, PredictionConstraints, PredictedCollege } from '../types/college.js';
+import type { DriveData } from '../types/drive.js';
 
 const apiKey = process.env.GOOGLE_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -17,19 +18,49 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // ── Scoring ─────────────────────────────────────────────────────────────
 
-function scoreAndRank(filtered: College[], offeredCtc: number): PredictedCollege[] {
+function scoreAndRank(
+  filtered: College[],
+  ctcFixed?: number,
+  ctcMin?: number,
+  ctcMax?: number
+): PredictedCollege[] {
   return filtered
     .map((college) => {
       const avgPkg = college.placement?.avg_package_lpa ?? 0;
       const placementRate = college.placement?.placement_rate_percent ?? 100;
 
-      // Budget score
-      const salaryDiff = offeredCtc - avgPkg;
+      // Budget score — depends on whether we have fixed CTC or a range
       let budgetScore: number;
-      if (salaryDiff < 0) {
-        budgetScore = Math.max(0, 1.0 + salaryDiff / 10);
+      let salaryDiff: number;
+
+      if (ctcMin != null && ctcMax != null) {
+        // Range: compare both limits against college avg package
+        // If avg_pkg is within range → perfect score
+        // If avg_pkg > ctcMax → offered salary too low → penalty
+        // If avg_pkg < ctcMin → offered salary exceeds expectations → bonus (capped)
+        if (avgPkg <= ctcMax && avgPkg >= ctcMin) {
+          // College avg package is within offered range — ideal match
+          budgetScore = 1.0;
+        } else if (avgPkg > ctcMax) {
+          // College expects more than our max — penalize
+          salaryDiff = ctcMax - avgPkg; // negative
+          budgetScore = Math.max(0, 1.0 + salaryDiff / 10);
+        } else {
+          // College avg is below our min — we're overpaying (still good)
+          salaryDiff = ctcMin - avgPkg; // positive
+          budgetScore = Math.min(1.0, 1.0 + salaryDiff / 20);
+        }
+        // Use midpoint for category determination
+        salaryDiff = ((ctcMin + ctcMax) / 2) - avgPkg;
       } else {
-        budgetScore = Math.min(1.0, 1.0 + salaryDiff / 20);
+        // Fixed CTC (single value)
+        const offeredCtc = ctcFixed ?? 10;
+        salaryDiff = offeredCtc - avgPkg;
+        if (salaryDiff < 0) {
+          budgetScore = Math.max(0, 1.0 + salaryDiff / 10);
+        } else {
+          budgetScore = Math.min(1.0, 1.0 + salaryDiff / 20);
+        }
       }
 
       // Weighted match probability
@@ -113,10 +144,78 @@ export async function predictColleges(
   if (filtered.length === 0) return [];
 
   // Phase 2: Score and rank
-  const ranked = scoreAndRank(filtered, constraints.ctc);
+  const hasRange = constraints.ctc_min != null && constraints.ctc_max != null;
+  const ranked = scoreAndRank(
+    filtered,
+    hasRange ? undefined : constraints.ctc,
+    constraints.ctc_min,
+    constraints.ctc_max
+  );
 
   // Phase 3: AI briefing (async, non-blocking on failure)
-  await addAiBriefing(ranked, constraints.ctc);
+  const briefingCtc = hasRange
+    ? (constraints.ctc_min! + constraints.ctc_max!) / 2
+    : (constraints.ctc ?? 10);
+  await addAiBriefing(ranked, briefingCtc);
 
   return ranked;
+}
+
+export async function hydrateDriveData(dd: DriveData): Promise<DriveData> {
+  if (!dd.predictedColleges || dd.predictedColleges.length === 0) {
+    return dd;
+  }
+
+  // 1. Handle fallback if legacy string IDs were stored
+  if (typeof dd.predictedColleges[0] === 'string') {
+    const ids = dd.predictedColleges as string[];
+    const allColleges = await collegeRepository.findByIds(ids);
+    const hydrated = allColleges.map((c) => ({
+      ...c,
+      match_probability: 100,
+      category: 'Balanced Tier',
+    }));
+    return {
+      ...dd,
+      predictedColleges: hydrated,
+    };
+  }
+
+  // 2. If it's already full objects (with a 'name' property), return as-is
+  if (
+    dd.predictedColleges[0] &&
+    typeof dd.predictedColleges[0] === 'object' &&
+    'name' in dd.predictedColleges[0]
+  ) {
+    return dd;
+  }
+
+  // 3. Otherwise, they are lightweight references: { id, match_probability, category }
+  const refs = dd.predictedColleges as {
+    id: string;
+    match_probability: number;
+    category: string;
+  }[];
+
+  const ids = refs.map((r) => r.id);
+  const allColleges = await collegeRepository.findByIds(ids);
+
+  const collegeMap = new Map(allColleges.map((c) => [c.id, c]));
+  const hydrated = refs
+    .map((ref) => {
+      const col = collegeMap.get(ref.id);
+      if (!col) return null;
+      return {
+        ...col,
+        match_probability: ref.match_probability,
+        category: ref.category,
+        ai_strategic_briefing: dd.aiStrategicBriefing || undefined,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  return {
+    ...dd,
+    predictedColleges: hydrated,
+  };
 }

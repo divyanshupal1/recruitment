@@ -36,12 +36,26 @@ export const collegeRepository = {
 
     console.log(`[CollegeRepo] Firestore returned ${results.length} docs (server-side filters applied).`);
 
-    // 3. Region partial match — client-side (Firestore has no substring/LIKE operator)
+    // 3. Region matching — client-side (Firestore has no substring/LIKE operator)
     const regionQuery = constraints.region_query?.toLowerCase();
     if (regionQuery && regionQuery !== 'any') {
+      // Known region names for exact matching (from LLM normalization)
+      const KNOWN_REGIONS = [
+        'north india', 'south india', 'east india',
+        'west india', 'central india', 'north east india',
+      ];
+      const isExactRegion = KNOWN_REGIONS.includes(regionQuery);
+
       results = results.filter((c: College) => {
         const loc = c.location;
         if (!loc) return false;
+
+        if (isExactRegion) {
+          // Exact region match — LLM already normalized to our canonical regions
+          return loc.region?.toLowerCase() === regionQuery;
+        }
+
+        // Fuzzy fallback — check city/state/region for partial substring match
         return (
           loc.city?.toLowerCase().includes(regionQuery) ||
           loc.state?.toLowerCase().includes(regionQuery) ||
@@ -52,10 +66,37 @@ export const collegeRepository = {
 
     // 4. Degree membership — client-side (already used array-contains for branches)
     if (constraints.required_degree) {
-      results = results.filter((c: College) => c.degrees?.includes(constraints.required_degree));
+      const targetDegree = constraints.required_degree;
+      results = results.filter((c: College) => c.degrees?.includes(targetDegree));
     }
 
     console.log(`[CollegeRepo] After client-side filters: ${results.length} colleges.`);
     return results;
+  },
+
+  /**
+   * Fetches specific colleges by their document IDs.
+   * Used when loading stored predictions from driveData.predictedColleges.
+   */
+  async findByIds(ids: string[]): Promise<College[]> {
+    if (!ids || ids.length === 0) return [];
+
+    // Firestore getAll supports up to 100 docs at a time
+    const BATCH_SIZE = 100;
+    const allDocs: College[] = [];
+
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const refs = batch.map((id) => collegesCollection.doc(id));
+      const snapshots = await collegesCollection.firestore.getAll(...refs);
+
+      for (const snap of snapshots) {
+        if (snap.exists) {
+          allDocs.push(snap.data() as College);
+        }
+      }
+    }
+
+    return allDocs;
   },
 };
